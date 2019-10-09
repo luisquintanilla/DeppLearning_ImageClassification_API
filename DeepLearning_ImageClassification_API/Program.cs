@@ -39,7 +39,7 @@ namespace DeepLearning_ImageClassification_API
             var trainingPipeline =
                 mapLabelEstimator
                 .Append(mlContext.Model.ImageClassification(
-                    featuresColumnName: "ImagePath",
+                    featuresColumnName: "Image",
                     labelColumnName: "LabelAsKey",
                     arch: ImageClassificationEstimator.Architecture.ResnetV2101,
                     epoch: 100,
@@ -48,7 +48,8 @@ namespace DeepLearning_ImageClassification_API
                     metricsCallback: (metrics) => Console.WriteLine(metrics),
                     validationSet: transformedValidationData,
                     reuseTrainSetBottleneckCachedValues: true,
-                    reuseValidationSetBottleneckCachedValues: true));
+                    reuseValidationSetBottleneckCachedValues: true))
+                .Append(mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
 
             ITransformer trainedModel = trainingPipeline.Fit(trainSet);
 
@@ -61,14 +62,11 @@ namespace DeepLearning_ImageClassification_API
         {
             IDataView predictionData = trainedModel.Transform(data);
 
-            var keyMappings = GetKeyMappings(predictionData);
-
             IEnumerable<ModelOutput> predictions = mlContext.Data.CreateEnumerable<ModelOutput>(predictionData, reuseRowObject: true).Take(10);
 
             foreach (var prediction in predictions)
             {
-                var predictedLabelValue = keyMappings[prediction.PredictedLabel];
-                Console.WriteLine($"Actual Value: {prediction.Label} | Predicted Value: {predictedLabelValue}");
+                Console.WriteLine($"Actual Value: {prediction.Label} | Predicted Value: {prediction.PredictedLabel}");
             }
         }
 
@@ -100,6 +98,7 @@ namespace DeepLearning_ImageClassification_API
                 yield return new ModelInput()
                 {
                     ImagePath = file,
+                    Image = File.ReadAllBytes(file),
                     Label = label
                 };
             }
@@ -117,7 +116,7 @@ namespace DeepLearning_ImageClassification_API
     class ModelInput
     {
         public string ImagePath { get; set; }
-
+        public byte[] Image { get; set; }
         public string Label { get; set; }
     }
 
@@ -125,6 +124,6 @@ namespace DeepLearning_ImageClassification_API
     {
         public string Label { get; set; }
 
-        public UInt32 PredictedLabel { get; set; }
+        public string PredictedLabel { get; set; }
     }
 }
